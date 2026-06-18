@@ -1,0 +1,28 @@
+{
+  "_comment": "현장 표준 여유값으로 교체하세요. 단위 mm. 실제 절단 치수에 직접 반영됩니다.",
+  "seam_allowance_mm": {
+    "Pittsburgh": 22.0,
+    "Snap Lock": 16.0,
+    "Button Punch": 16.0,
+    "Drive Cleat": 12.0,
+    "None": 0.0
+  },
+  "end_allowance_mm": {
+    "Angle Flange + Bolt": 0.0,
+    "TDC": 9.5,
+    "TDF": 9.5,
+    "S&D (Slip & Drive)": 6.0,
+    "None": 0.0
+  },
+  "gauge_thickness_mm": {
+    "30": 0.40, "28": 0.48, "26": 0.55, "24": 0.70, "22": 0.85,
+    "20": 1.00, "18": 1.31, "16": 1.61, "14": 1.99
+  },
+  "defaults": {
+    "seam": "Pittsburgh",
+    "joint": "Angle Flange + Bolt",
+    "gauge": "18",
+    "output_unit": "mm",
+    "dim_basis": "ID"
+  }
+}
