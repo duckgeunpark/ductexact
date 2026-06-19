@@ -6,7 +6,7 @@ import sys
 from PySide6.QtWidgets import QApplication
 
 from .ui.main_window import MainWindow
-from .ui.resources import app_icon
+from .ui.resources import app_icon, apply_win_taskbar_icon
 
 
 def _set_windows_app_id() -> None:
@@ -22,11 +22,14 @@ def _set_windows_app_id() -> None:
 
 
 def main() -> int:
+    # 작업표시줄이 창 아이콘을 쓰도록 AppID 지정.
     _set_windows_app_id()
     app = QApplication(sys.argv)
-    app.setWindowIcon(app_icon())   # 작업표시줄/전역 기본 아이콘
+    app.setWindowIcon(app_icon())   # 창 제목표시줄/전역 기본 아이콘
     win = MainWindow()
     win.show()
+    # show 이후 winId 가 유효 → Win32 로 작업표시줄 아이콘 직접 강제 적용
+    apply_win_taskbar_icon(win)
     return app.exec()
 
 

@@ -146,8 +146,22 @@ class MainWindow(QMainWindow):
         return box
 
     def _build_nesting_box(self) -> QGroupBox:
-        box = QGroupBox("네스팅 (판재 배치)")
-        form = QFormLayout(box)
+        # 체크 가능한 그룹박스로 접기/펼치기. 기본 접힘.
+        box = QGroupBox("네스팅 (판재 배치)  ▸ 펼치려면 체크")
+        box.setCheckable(True)
+        box.setChecked(False)
+        outer = QVBoxLayout(box)
+        content = QWidget()
+        form = QFormLayout(content)
+        outer.addWidget(content)
+        content.setVisible(False)                    # 기본 접힘
+
+        def _toggle_nest(on: bool):
+            content.setVisible(on)
+            box.setTitle("네스팅 (판재 배치)" if on
+                         else "네스팅 (판재 배치)  ▸ 펼치려면 체크")
+
+        box.toggled.connect(_toggle_nest)
         self.sheet_w = QDoubleSpinBox()
         self.sheet_w.setRange(100, 100000)
         self.sheet_w.setValue(1219)      # 4ft

@@ -32,3 +32,34 @@ def app_icon() -> QIcon:
         if os.path.exists(p):
             icon.addFile(p)
     return icon
+
+
+def apply_win_taskbar_icon(win) -> None:
+    """Windows 작업표시줄/제목표시줄 아이콘을 Win32 로 직접 설정.
+
+    Qt setWindowIcon 이 작업표시줄까지 반영되지 않는 경우 대비.
+    창이 생성된 뒤(show 이후) 호출해야 winId 가 유효하다.
+    """
+    if sys.platform != "win32":
+        return
+    ico = os.path.join(icon_dir(), "app.ico")
+    if not os.path.exists(ico):
+        return
+    try:
+        import ctypes
+        user32 = ctypes.windll.user32
+        IMAGE_ICON = 1
+        LR_LOADFROMFILE, LR_DEFAULTSIZE = 0x0010, 0x0040
+        WM_SETICON = 0x0080
+        ICON_SMALL, ICON_BIG = 0, 1
+        hwnd = int(win.winId())
+        h_big = user32.LoadImageW(None, ico, IMAGE_ICON, 0, 0,
+                                  LR_LOADFROMFILE | LR_DEFAULTSIZE)
+        h_small = user32.LoadImageW(None, ico, IMAGE_ICON, 16, 16,
+                                    LR_LOADFROMFILE)
+        if h_big:
+            user32.SendMessageW(hwnd, WM_SETICON, ICON_BIG, h_big)
+        if h_small:
+            user32.SendMessageW(hwnd, WM_SETICON, ICON_SMALL, h_small)
+    except Exception:  # noqa: BLE001 - 실패해도 앱 실행에는 지장 없음
+        pass
