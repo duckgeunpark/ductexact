@@ -15,6 +15,7 @@ class Placement:
     name: str
     outline: list[Point]               # 시트 좌표로 배치된 외형
     fold_lines: list = field(default_factory=list)
+    mark_lines: list = field(default_factory=list)
     x: float = 0.0
     y: float = 0.0
     rotated: bool = False
@@ -77,6 +78,7 @@ class _Item:
     name: str
     outline: list[Point]
     folds: list
+    marks: list
     w: float
     h: float
 
@@ -86,13 +88,14 @@ def _expand(patterns: list[Pattern], gap: float) -> list[_Item]:
     for pat in patterns:
         for panel in pat.panels:
             norm, w, h = _normalize(panel.outline)
-            # fold 도 같은 원점으로
+            # fold/mark 도 같은 원점으로
             xs = [p[0] for p in panel.outline]
             ys = [p[1] for p in panel.outline]
             ox, oy = min(xs), min(ys)
             folds = _seg_offset(panel.fold_lines, -ox, -oy)
+            marks = _seg_offset(panel.mark_lines, -ox, -oy)
             for _ in range(max(panel.qty, 1)):
-                items.append(_Item(panel.name, norm, folds, w, h))
+                items.append(_Item(panel.name, norm, folds, marks, w, h))
     return items
 
 
@@ -116,19 +119,19 @@ def nest(patterns: list[Pattern], sheet_w: float, sheet_h: float,
         sheet = sheets[si]
         shelves = shelves_per_sheet[si]
         for orient in _orientations(it, allow_rotate, sheet_w, sheet_h):
-            w, h, outline, folds, rotated = orient
+            w, h, outline, folds, marks, rotated = orient
             # 기존 셸프 first-fit
             for sh in shelves:
                 y_base, shelf_h, cursor_x = sh
                 if h <= shelf_h + 1e-6 and cursor_x + w <= sheet_w + 1e-6:
-                    _commit(sheet, it, outline, folds, cursor_x, y_base, rotated)
+                    _commit(sheet, it, outline, folds, marks, cursor_x, y_base, rotated)
                     sh[2] = cursor_x + w + gap
                     return True
             # 새 셸프
             top = (shelves[-1][0] + shelves[-1][1] + gap) if shelves else 0.0
             if top + h <= sheet_h + 1e-6 and w <= sheet_w + 1e-6:
                 shelves.append([top, h, w + gap])
-                _commit(sheet, it, outline, folds, 0.0, top, rotated)
+                _commit(sheet, it, outline, folds, marks, 0.0, top, rotated)
                 return True
         return False
 
@@ -151,14 +154,16 @@ def nest(patterns: list[Pattern], sheet_w: float, sheet_h: float,
 
 
 def _orientations(it: _Item, allow_rotate: bool, sw: float, sh: float):
-    """배치 후보(높이 작은 순). (w,h,outline,folds,rotated)."""
-    cands = [(it.w, it.h, it.outline, it.folds, False)]
+    """배치 후보(높이 작은 순). (w,h,outline,folds,marks,rotated)."""
+    cands = [(it.w, it.h, it.outline, it.folds, it.marks, False)]
     if allow_rotate:
         rout = _rot90(it.outline)
         rfold = [((-a[1], a[0]), (-b[1], b[0])) for a, b in it.folds]
-        # rot fold 정규화 위해 outline 기준 동일 오프셋 적용
+        rmark = [((-a[1], a[0]), (-b[1], b[0])) for a, b in it.marks]
+        # rot fold/mark 정규화 위해 outline 기준 동일 오프셋 적용
         rfold = _renorm_folds(it.outline, rfold)
-        cands.append((it.h, it.w, rout, rfold, True))
+        rmark = _renorm_folds(it.outline, rmark)
+        cands.append((it.h, it.w, rout, rfold, rmark, True))
     cands = [c for c in cands if c[0] <= sw + 1e-6 and c[1] <= sh + 1e-6]
     cands.sort(key=lambda c: c[1])
     return cands
@@ -173,7 +178,8 @@ def _renorm_folds(orig_outline, rotated_folds):
     return [((a[0] - ox, a[1] - oy), (b[0] - ox, b[1] - oy)) for a, b in rotated_folds]
 
 
-def _commit(sheet, it, outline, folds, x, y, rotated):
+def _commit(sheet, it, outline, folds, marks, x, y, rotated):
     out = [(px + x, py + y) for px, py in outline]
     fl = [((a[0] + x, a[1] + y), (b[0] + x, b[1] + y)) for a, b in folds]
-    sheet.placements.append(Placement(it.name, out, fl, x, y, rotated))
+    mk = [((a[0] + x, a[1] + y), (b[0] + x, b[1] + y)) for a, b in marks]
+    sheet.placements.append(Placement(it.name, out, fl, mk, x, y, rotated))

@@ -27,7 +27,7 @@ class ParamSpec:
 class CommonSettings:
     """모든 형상 공통 제작 설정 (mm 여유값은 테이블에서 조회)."""
 
-    seam: str = "Pittsburgh"
+    seam: str = "None"
     joint: str = "Angle Flange + Bolt"
     gauge: str = "18"
     output_unit: str = "mm"

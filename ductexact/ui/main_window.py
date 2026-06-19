@@ -19,15 +19,19 @@ from ..config import load_config
 from ..io.dxf_export import export_pattern
 from ..io.nesting_dxf import export_nesting
 from ..io.drawing_dxf import export_drawing
-from ..io.table_export import export_csv, as_text
+from ..io.table_export import (
+    export_csv, export_draw_csv, draw_table, as_text, DRAW_HEADERS,
+)
 from .param_form import ParamForm
 from .preview import PreviewCanvas
+from .resources import app_icon
 
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("DuctExact — 덕트 전개도 생성기")
+        self.setWindowTitle("DuctExact")
+        self.setWindowIcon(app_icon())
         self.resize(1180, 720)
         self.cfg_data = load_config()
         self.current_pattern = None
@@ -82,8 +86,8 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.preview, "전개도")
         self.tabs.addTab(self.draw_preview, "완성도")
         right.addWidget(self.tabs, 3)
-        self.table = QTableWidget(0, 3)
-        self.table.setHorizontalHeaderLabels(["항목", "값", "단위"])
+        self.table = QTableWidget(0, len(DRAW_HEADERS))
+        self.table.setHorizontalHeaderLabels(DRAW_HEADERS)
         right.addWidget(self.table, 2)
         self.notes = QPlainTextEdit()
         self.notes.setReadOnly(True)
@@ -211,7 +215,14 @@ class MainWindow(QMainWindow):
         self.current_pattern = pat
         self.preview.show_pattern(pat)
         self._fill_table(pat)
-        self.notes.setPlainText("\n".join(pat.notes))
+        # 표는 도해(좌표)용이므로 요약값·비고는 아래 비고창에 표시
+        unit = self.outunit_cb.currentText()
+        summary = [f"{r.get('항목', '')}: {r.get('값', '')} {r.get('단위', '')}".strip()
+                   for r in pat.table]
+        lines = [f"[검산용 요약 — 단위 {unit}]"] + summary
+        if pat.notes:
+            lines += ["", "[비고]"] + pat.notes
+        self.notes.setPlainText("\n".join(lines))
         # 완성도(조립도)도 함께 생성
         try:
             self.current_drawing = build_drawing(shape.key, p, self._settings())
@@ -221,11 +232,14 @@ class MainWindow(QMainWindow):
             self.draw_preview.clear()
 
     def _fill_table(self, pat):
-        self.table.setRowCount(len(pat.table))
-        for i, r in enumerate(pat.table):
-            self.table.setItem(i, 0, QTableWidgetItem(str(r.get("항목", ""))))
-            self.table.setItem(i, 1, QTableWidgetItem(str(r.get("값", ""))))
-            self.table.setItem(i, 2, QTableWidgetItem(str(r.get("단위", ""))))
+        """우측 표에 '따라그리기 도해표'(좌표/접기선/경계선)를 채운다."""
+        headers, rows = draw_table(pat, self.outunit_cb.currentText())
+        self.table.setColumnCount(len(headers))
+        self.table.setHorizontalHeaderLabels(headers)
+        self.table.setRowCount(len(rows))
+        for i, row in enumerate(rows):
+            for j, val in enumerate(row):
+                self.table.setItem(i, j, QTableWidgetItem(str(val)))
         self.table.resizeColumnsToContents()
 
     def export_dxf(self):
@@ -287,5 +301,6 @@ class MainWindow(QMainWindow):
                                               "CSV (*.csv)")
         if not path:
             return
-        export_csv(self.current_pattern, path)
+        # 좌표 도해표(따라그리기) + 검산용 요약을 함께 저장
+        export_draw_csv(self.current_pattern, path, self.outunit_cb.currentText())
         QMessageBox.information(self, "완료", f"저장됨:\n{path}")

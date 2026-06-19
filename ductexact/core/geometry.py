@@ -56,12 +56,12 @@ def true_length(p0, p1) -> float:
     return math.sqrt(sum((a - b) ** 2 for a, b in zip(p0, p1)))
 
 
-def triangulate_strip(top: list, bottom: list, closed: bool = True) -> list[Point]:
-    """두 3D 점열(상/하단 둘레)을 삼각분할로 평면 전개.
+def develop_strip(top: list, bottom: list,
+                  closed: bool = False) -> tuple[list[Point], list[Point]]:
+    """두 3D 점열(상/하단)을 삼각분할로 평면 전개. 반환: (top_2d, bottom_2d).
 
-    인접한 top[i],bottom[i],top[i+1],bottom[i+1] 사각형을 두 삼각형으로
-    나눠 실길이를 유지하며 평면에 펼친다.  닫힌 둘레면 마지막을 처음과 연결.
-    반환: 전개된 외형 폴리라인(상단 진행 후 하단 역순)으로 닫힌 형상.
+    각 i 의 top_2d[i]·bottom_2d[i] 가 대응(실길이 보존)하며, 둘을 이으면
+    삼각분할(작도) 선이 된다.  외형은 top_2d + reversed(bottom_2d).
     """
     n = len(top)
     count = n if closed else n - 1
@@ -78,23 +78,65 @@ def triangulate_strip(top: list, bottom: list, closed: bool = True) -> list[Poin
         j = (i + 1) % n
         bx, by = bottom_2d[i]
         tx, ty = top_2d[i]
-        # 다음 하단점: 현재 하단점 + 현재 상단점에서 삼각측량
+        # 다음 하단점: 삼각형(B[i],T[i],B[i+1]). 공유변 (B[i],T[i]) 의
+        # 직전 삼각형 꼭짓점은 T[i-1] → 그 반대쪽으로 펼쳐야 접히지 않음.
         l_bb = true_length(bottom[i], bottom[j])
         l_tb_next = true_length(top[i], bottom[j])
-        nb = _triangulate_point((bx, by), (tx, ty), l_bb, l_tb_next)
+        ref_b = top_2d[i - 1] if i > 0 else None
+        nb = _triangulate_point((bx, by), (tx, ty), l_bb, l_tb_next, ref_b)
         bottom_2d.append(nb)
-        # 다음 상단점: 다음 하단점 + 현재 상단점에서
+        # 다음 상단점: 삼각형(T[i],B[i+1],T[i+1]). 공유변 (T[i],B[i+1]) 의
+        # 직전 삼각형 꼭짓점은 B[i] → 그 반대쪽으로 펼친다.
         l_tt = true_length(top[i], top[j])
         l_tnb = true_length(top[j], bottom[j])
-        nt = _triangulate_point((tx, ty), nb, l_tt, l_tnb)
+        nt = _triangulate_point((tx, ty), nb, l_tt, l_tnb, (bx, by))
         top_2d.append(nt)
 
-    outline = top_2d + list(reversed(bottom_2d))
-    return outline
+    return top_2d, bottom_2d
 
 
-def _triangulate_point(a: Point, b: Point, ra: float, rb: float) -> Point:
-    """a 에서 ra, b 에서 rb 떨어진 교점(진행 방향 기준 한 쪽)."""
+def triangulate_strip(top: list, bottom: list, closed: bool = True) -> list[Point]:
+    """두 3D 점열을 평면 전개한 닫힌 외형(상단 진행 후 하단 역순)."""
+    top_2d, bottom_2d = develop_strip(top, bottom, closed)
+    return top_2d + list(reversed(bottom_2d))
+
+
+def segments_intersect(p1, p2, p3, p4) -> bool:
+    def ccw(a, b, c):
+        return (c[1] - a[1]) * (b[0] - a[0]) - (b[1] - a[1]) * (c[0] - a[0])
+    d1, d2 = ccw(p3, p4, p1), ccw(p3, p4, p2)
+    d3, d4 = ccw(p1, p2, p3), ccw(p1, p2, p4)
+    return (d1 > 0) != (d2 > 0) and (d3 > 0) != (d4 > 0)
+
+
+def polyline_self_intersects(poly: list[Point], tol: float = 1e-6) -> bool:
+    """닫힌 폴리라인 자기교차 여부. 연속 중복점은 제거 후 판정."""
+    pts: list[Point] = []
+    for p in poly:
+        if not pts or math.hypot(p[0] - pts[-1][0], p[1] - pts[-1][1]) > tol:
+            pts.append(p)
+    if len(pts) > 1 and math.hypot(pts[0][0] - pts[-1][0],
+                                   pts[0][1] - pts[-1][1]) <= tol:
+        pts.pop()
+    n = len(pts)
+    for i in range(n):
+        a, b = pts[i], pts[(i + 1) % n]
+        for j in range(i + 1, n):
+            if j == i or (i + 1) % n == j or (j + 1) % n == i:
+                continue
+            if segments_intersect(a, b, pts[j], pts[(j + 1) % n]):
+                return True
+    return False
+
+
+def _triangulate_point(a: Point, b: Point, ra: float, rb: float,
+                       ref: Point | None = None) -> Point:
+    """a 에서 ra, b 에서 rb 떨어진 교점.
+
+    ref 가 주어지면 직선 a→b 기준 ref 의 *반대쪽* 해를 고른다(스트립이
+    공유변에서 접히지 않도록 일관된 방향으로 펼치기 위함). ref 가 없으면
+    +90° 쪽을 고른다.
+    """
     ax, ay = a
     bx, by = b
     # 공유 꼭짓점(0길이 변): 같은 점을 유지
@@ -105,13 +147,20 @@ def _triangulate_point(a: Point, b: Point, ra: float, rb: float) -> Point:
     d = math.hypot(bx - ax, by - ay)
     if d == 0:
         return (ax, ay + ra)
-    # 원-원 교점
+    # 원-원 교점 (두 해)
     aa = (ra * ra - rb * rb + d * d) / (2 * d)
-    h2 = ra * ra - aa * aa
-    h = math.sqrt(max(h2, 0.0))
+    h = math.sqrt(max(ra * ra - aa * aa, 0.0))
     mx = ax + aa * (bx - ax) / d
     my = ay + aa * (by - ay) / d
-    # 진행 방향(전개가 +x 로 퍼지도록) 한쪽 선택
-    ox = -(by - ay) / d * h
-    oy = (bx - ax) / d * h
-    return (mx + ox, my + oy)
+    ux = -(by - ay) / d        # 직선 a→b 의 +90° 단위 법선
+    uy = (bx - ax) / d
+    p_plus = (mx + ux * h, my + uy * h)
+    if ref is None:
+        return p_plus
+
+    def side(px, py):
+        return (bx - ax) * (py - ay) - (by - ay) * (px - ax)
+
+    if (side(*p_plus) > 0) == (side(ref[0], ref[1]) > 0):
+        return (mx - ux * h, my - uy * h)   # ref 와 반대쪽 해
+    return p_plus

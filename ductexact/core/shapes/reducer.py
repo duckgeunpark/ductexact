@@ -27,62 +27,70 @@ def _cone_frustum(D1: float, D2: float, L: float) -> tuple[list, float, float, f
     return outline, Rb, Rs, math.degrees(phi)
 
 
-def _square_to_round(W: float, H: float, D: float, L: float, k: int = 6) -> list:
-    """동심 사각↔원형 표준 전개를 좌/우 2조각(각 ~180° 부채꼴)으로.
+def _square_to_round(W: float, H: float, D: float, L: float, k: int = 6):
+    """동심 사각↔원형 표준 삼각분할 전개(단일 조각, 코너 심).
 
-    4개 평면삼각형(각 변→해당 변의 접점) + 4개 코너 콘(코너→원 1/4호).
-    한 조각으로 펼치면 360° 닫힌 띠가 되어 시접에서 자기교차하므로,
-    변 중앙(접점 방향)을 심선으로 삼아 반씩 나눈다.  반환: [Panel, Panel].
+    면=평면삼각형(변→해당 접점), 코너=콘(코너→원 1/4호)을 한 코너에서 심을
+    트고 360° 한 바퀴 이어 한 장으로 펼친다(표준 크라운 형태).
+    반환: (outline, tri_lines) — tri_lines 는 삼각분할 작도선.
     """
     r = D / 2
-    c0 = (-W / 2, -H / 2, 0.0)
-    c1 = (W / 2, -H / 2, 0.0)
-    c2 = (W / 2, H / 2, 0.0)
-    c3 = (-W / 2, H / 2, 0.0)
-    mid0 = (0.0, -H / 2, 0.0)     # 아랫변 중앙(심)
-    mid2 = (0.0, H / 2, 0.0)      # 윗변 중앙(심)
-    ang = {"M0": -math.pi / 2, "M1": 0.0, "M2": math.pi / 2, "M3": math.pi}
+    c = [(-W / 2, -H / 2, 0.0), (W / 2, -H / 2, 0.0),
+         (W / 2, H / 2, 0.0), (-W / 2, H / 2, 0.0)]      # c0..c3 (반시계)
+    M = [-math.pi / 2, 0.0, math.pi / 2, math.pi]        # 각 변 접점 각도
 
     def circ(a):
         return (r * math.cos(a), r * math.sin(a), L)
 
-    def cone(bottom_pt, a0, a1, top, bot):
+    top: list = []
+    bot: list = []
+
+    def flat(p_from, p_to, apex):
+        m = circ(apex)
+        top.append(m); bot.append(p_from)
+        top.append(m); bot.append(p_to)
+
+    def cone(corner, a0, a1):
         if a1 <= a0:
             a1 += 2 * math.pi
         for s in range(1, k + 1):
             top.append(circ(a0 + (a1 - a0) * s / k))
-            bot.append(bottom_pt)
+            bot.append(corner)
 
-    def tri(p_from, p_to, apex_a, top, bot):
-        m = circ(apex_a)
-        top.append(m); bot.append(p_from)
-        top.append(m); bot.append(p_to)
+    # c0 에서 심 → 밑변·우변·윗변·좌변 면삼각형 + 4 코너 콘 → c0 로 복귀
+    for i in range(4):
+        flat(c[i], c[(i + 1) % 4], M[i])
+        cone(c[(i + 1) % 4], M[i], M[(i + 1) % 4])
 
-    def half(seq):
-        top: list = []
-        bot: list = []
-        seq(top, bot)
-        outline = g.triangulate_strip(top, bot, closed=False)
-        x0, y0, _, _ = g.bbox(outline)
-        return g.translate(outline, -x0, -y0)
+    # 자기교차 없는 펼침 방향 자동 선택
+    best = None
+    for t, b in ((top, bot), (list(reversed(top)), list(reversed(bot)))):
+        t2, b2 = g.develop_strip(t, b, closed=False)
+        outline = t2 + list(reversed(b2))
+        if not g.polyline_self_intersects(outline):
+            best = (t2, b2)
+            break
+    if best is None:                       # 둘 다 교차하면 첫 결과 사용
+        best = g.develop_strip(top, bot, closed=False)
+    t2, b2 = best
 
-    # A: mid0 → (+X쪽) → mid2
-    def seqA(top, bot):
-        tri(mid0, c1, ang["M0"], top, bot)
-        cone(c1, ang["M0"], ang["M1"], top, bot)
-        tri(c1, c2, ang["M1"], top, bot)
-        cone(c2, ang["M1"], ang["M2"], top, bot)
-        tri(c2, mid2, ang["M2"], top, bot)
+    x0, y0, _, _ = g.bbox(t2 + b2)
+    t2 = [(x - x0, y - y0) for x, y in t2]
+    b2 = [(x - x0, y - y0) for x, y in b2]
+    outline = t2 + list(reversed(b2))
 
-    # B: mid2 → (−X쪽) → mid0
-    def seqB(top, bot):
-        tri(mid2, c3, ang["M2"], top, bot)
-        cone(c3, ang["M2"], ang["M3"], top, bot)
-        tri(c3, c0, ang["M3"], top, bot)
-        cone(c0, ang["M3"], ang["M0"], top, bot)
-        tri(c0, mid0, ang["M0"], top, bot)
-
-    return [half(seqA), half(seqB)]
+    # 삼각분할 작도선: 대응하는 bottom[i]-top[i] (중복/0길이 제거)
+    tri_lines = []
+    seen = set()
+    for a, bp in zip(b2, t2):
+        if math.hypot(bp[0] - a[0], bp[1] - a[1]) < 1e-6:
+            continue
+        key = (round(a[0], 1), round(a[1], 1), round(bp[0], 1), round(bp[1], 1))
+        if key in seen:
+            continue
+        seen.add(key)
+        tri_lines.append((a, bp))
+    return outline, tri_lines
 
 
 def _rect_to_rect(W1, H1, W2, H2, L) -> list[Panel]:
@@ -142,15 +150,17 @@ class Reducer(Shape):
             else:  # 원형→사각
                 Dr, Wsq, Hsq = p["D1"], p["D2"], p["H2"]
                 in_txt, out_txt = f"Ø{Dr:g}", f"{Wsq:g}x{Hsq:g}"
-            halfA, halfB = _square_to_round(Wsq, Hsq, Dr, L)
-            pat.add_panel(Panel("전개 A (절반)", halfA, qty=1,
-                                texts=[(0, 0, "HALF A")]))
-            pat.add_panel(Panel("전개 B (절반)", halfB, qty=1,
-                                texts=[(0, 0, "HALF B")]))
+            outline, tri_lines = _square_to_round(Wsq, Hsq, Dr, L)
+            x0, y0, x1, y1 = g.bbox(outline)
+            pat.add_panel(Panel("전개 (1조각)", outline, qty=1,
+                                fold_lines=tri_lines,
+                                texts=[((x0 + x1) / 2, (y0 + y1) / 2,
+                                        f"{in_txt} → {out_txt}")]))
             pat.add_row(항목="입구", 값=in_txt, 단위="mm")
             pat.add_row(항목="출구", 값=out_txt, 단위="mm")
-            pat.add_row(항목="조각", 값="2조각(변 중앙 심)", 단위="EA")
-            pat.notes.append("동심 삼각분할. 변 중앙을 심선으로 2조각 분할(자기교차 방지).")
+            pat.add_row(항목="조각", 값="1조각(코너 심)", 단위="EA")
+            pat.notes.append("동심 삼각분할 표준 전개(한 코너에서 심을 트고 한 장). "
+                             "점선=삼각분할 작도선. 호=원 둘레 전개.")
             pat.notes.append("편심은 후속 지원.")
         else:  # 사각→사각
             for panel in _rect_to_rect(p["D1"], p["H1"], p["D2"], p["H2"], L):

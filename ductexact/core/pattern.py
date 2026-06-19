@@ -17,7 +17,9 @@ class Panel:
     name: str
     outline: list[Point]                       # 닫힌 외형(절단선) 폴리라인
     qty: int = 1                               # 동일 패널 매수
-    fold_lines: list[Segment] = field(default_factory=list)   # 접기선(점선)
+    fold_lines: list[Segment] = field(default_factory=list)   # 접기선(실제 절곡)
+    mark_lines: list[Segment] = field(default_factory=list)   # 여유 경계선(심·단부)
+    curves: list[dict] = field(default_factory=list)          # 도해표용 곡선 정의(원호/공식)
     texts: list[tuple[float, float, str]] = field(default_factory=list)  # 주석
 
     def bbox(self) -> tuple[float, float, float, float]:

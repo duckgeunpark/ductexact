@@ -59,8 +59,8 @@ class RectElbow(Shape):
         cheek = cheek_outline(Rt, Rh, theta, leg, end=end)
         x0, y0, x1, y1 = g.bbox(cheek)
         cheek = g.translate(cheek, -x0, -y0)
-        # 측판 단부 플랜지 절곡선(직관/단부 경계)
-        cheek_folds = []
+        # 측판 단부 여유 경계(직관/단부 플랜지 경계) — 여유 경계선
+        cheek_marks = []
         if end > 0:
             ct, st = math.cos(theta), math.sin(theta)
             tt = (-st, ct)
@@ -68,7 +68,7 @@ class RectElbow(Shape):
             segs = [((Rt, -leg), (Rh, -leg)),
                     ((P_inT[0] + leg * tt[0], P_inT[1] + leg * tt[1]),
                      (P_outT[0] + leg * tt[0], P_outT[1] + leg * tt[1]))]
-            cheek_folds = [((a[0] - x0, a[1] - y0), (b[0] - x0, b[1] - y0))
+            cheek_marks = [((a[0] - x0, a[1] - y0), (b[0] - x0, b[1] - y0))
                            for a, b in segs]
 
         # --- 외피 wrap: [end|leg|호|leg|end] 길이 × (H+seam) 폭 ---
@@ -80,18 +80,29 @@ class RectElbow(Shape):
             Hdev = H + seam
             outline = [(0, 0), (total, 0), (total, Hdev), (0, Hdev)]
             folds = []
-            xa, xb = end + leg, end + leg + arc_len          # 직관/곡면 경계
+            xa, xb = end + leg, end + leg + arc_len          # 직관/곡면 경계(절곡)
             folds += [((xa, 0), (xa, Hdev)), ((xb, 0), (xb, Hdev))]
-            if end > 0:                                      # 단부 절곡선
-                folds += [((end, 0), (end, Hdev)),
+            marks = []
+            if end > 0:                                      # 단부 여유 경계
+                marks += [((end, 0), (end, Hdev)),
                           ((total - end, 0), (total - end, Hdev))]
             if seam > 0:                                     # 심 경계(폭 방향)
-                folds.append(((0, H), (total, H)))
-            return Panel(name, outline, qty=1, fold_lines=folds,
+                marks.append(((0, H), (total, H)))
+            return Panel(name, outline, qty=1, fold_lines=folds, mark_lines=marks,
                          texts=[(total / 2, Hdev / 2, f"{tag}  L={total:.0f}")])
 
+        # 측판 곡선 = 동심 원호(목/등). 중심은 원점→정규화로 (-x0,-y0) 이동.
+        deg = math.degrees(theta)
+        cheek_curves = [
+            {"kind": "arc", "name": "목 원호 Rt", "cx": -x0, "cy": -y0,
+             "r": Rt, "a0": 0.0, "a1": deg},
+            {"kind": "arc", "name": "등 원호 Rh", "cx": -x0, "cy": -y0,
+             "r": Rh, "a0": 0.0, "a1": deg},
+        ]
+
         pat = Pattern(self.name)
-        pat.add_panel(Panel("측판 Cheek", cheek, qty=2, fold_lines=cheek_folds,
+        pat.add_panel(Panel("측판 Cheek", cheek, qty=2, mark_lines=cheek_marks,
+                            curves=cheek_curves,
                             texts=[((x1 - x0) * 0.55, (y1 - y0) * 0.45,
                                     "CHEEK x2")]))
         pat.add_panel(wrap(throat_len, "목 외피 Throat", "THROAT"))

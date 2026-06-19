@@ -29,18 +29,19 @@ class RoundStraight(Shape):
         dev_l = L + 2 * end
 
         outline = [(0, 0), (dev_w, 0), (dev_w, dev_l), (0, dev_l)]
-        folds = []
+        # 원통은 절곡선 없음 — 심/단부 여유 경계선만 표시
+        marks = []
         if seam > 0:
-            folds.append(((circ, 0), (circ, dev_l)))
+            marks.append(((circ, 0), (circ, dev_l)))
         if end > 0:
-            folds.append(((0, end), (dev_w, end)))
-            folds.append(((0, dev_l - end), (dev_w, dev_l - end)))
+            marks.append(((0, end), (dev_w, end)))
+            marks.append(((0, dev_l - end), (dev_w, dev_l - end)))
 
         texts = [(dev_w / 2, dev_l / 2, f"{self.name}  Ø{D:g}, L={L:g}")]
 
         pat = Pattern(self.name)
         pat.add_panel(Panel("본체(Body)", outline, qty=1,
-                            fold_lines=folds, texts=texts))
+                            mark_lines=marks, texts=texts))
         pat.add_row(항목="원주 πD", 값=round(circ, 1), 단위="mm")
         pat.add_row(항목="전개 폭", 값=round(dev_w, 1), 단위="mm")
         pat.add_row(항목="전개 길이", 값=round(dev_l, 1), 단위="mm")

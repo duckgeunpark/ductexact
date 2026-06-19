@@ -11,7 +11,8 @@ _INSUNITS = {"mm": 4, "cm": 5, "m": 6, "in": 1, "ft": 2}
 
 _LAYERS = {
     "OUTLINE": 7,   # 흰/검 - 절단선
-    "FOLD": 3,      # 초록 - 접기선
+    "FOLD": 3,      # 초록 - 접기선(실제 절곡)
+    "MARK": 30,     # 주황 - 여유 경계선(심·단부)
     "DIM": 1,       # 빨강 - 치수
     "TEXT": 2,      # 노랑 - 주석
 }
@@ -28,6 +29,7 @@ def export_pattern(pattern: Pattern, path: str, out_unit: str = "mm",
         if name not in doc.layers:
             doc.layers.add(name, color=color)
     doc.layers.get("FOLD").dxf.linetype = "DASHED"
+    doc.layers.get("MARK").dxf.linetype = "DASHDOT"
 
     def conv(pt):
         return (from_mm(pt[0], out_unit), from_mm(pt[1], out_unit))
@@ -53,6 +55,10 @@ def export_pattern(pattern: Pattern, path: str, out_unit: str = "mm",
         # 접기선
         for (a, b) in panel.fold_lines:
             msp.add_line(place(a), place(b), dxfattribs={"layer": "FOLD"})
+
+        # 여유 경계선(심·단부)
+        for (a, b) in panel.mark_lines:
+            msp.add_line(place(a), place(b), dxfattribs={"layer": "MARK"})
 
         # 패널 라벨
         label = f"{panel.name}  x{panel.qty}"

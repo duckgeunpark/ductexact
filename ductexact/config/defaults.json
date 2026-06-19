@@ -19,7 +19,7 @@
     "20": 1.00, "18": 1.31, "16": 1.61, "14": 1.99
   },
   "defaults": {
-    "seam": "Pittsburgh",
+    "seam": "None",
     "joint": "Angle Flange + Bolt",
     "gauge": "18",
     "output_unit": "mm",

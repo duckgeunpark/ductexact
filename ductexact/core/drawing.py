@@ -77,7 +77,10 @@ def dim_geometry(d: LinearDim, arrow: float = 12.0, ext: float = 4.0):
             segs.append(((xa, ly), (xa + sgn * arrow, ly + arrow * 0.35)))
             segs.append(((xa, ly), (xa + sgn * arrow, ly - arrow * 0.35)))
         val = d.text if d.text is not None else f"{abs(x2 - x1):.0f}"
-        return segs, ((min(x1, x2) + max(x1, x2)) / 2, ly), val, 0
+        # 숫자는 치수선 위쪽(점에서 먼 쪽)으로 띄워 화살표와 겹치지 않게
+        side = 1.0 if (ly - p1[1]) >= 0 else -1.0
+        ty = ly + side * arrow * 0.6
+        return segs, ((min(x1, x2) + max(x1, x2)) / 2, ty), val, 0
     else:  # 수직
         lx = base[0]
         y1, y2 = p1[1], p2[1]
@@ -89,4 +92,7 @@ def dim_geometry(d: LinearDim, arrow: float = 12.0, ext: float = 4.0):
             segs.append(((lx, ya), (lx + arrow * 0.35, ya + sgn * arrow)))
             segs.append(((lx, ya), (lx - arrow * 0.35, ya + sgn * arrow)))
         val = d.text if d.text is not None else f"{abs(y2 - y1):.0f}"
-        return segs, (lx, (min(y1, y2) + max(y1, y2)) / 2), val, 90
+        # 숫자는 치수선 옆(점에서 먼 쪽)으로 띄워 화살표와 겹치지 않게
+        side = 1.0 if (lx - p1[0]) >= 0 else -1.0
+        tx = lx + side * arrow * 0.6
+        return segs, (tx, (min(y1, y2) + max(y1, y2)) / 2), val, 90

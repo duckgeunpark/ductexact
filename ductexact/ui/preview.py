@@ -32,7 +32,6 @@ class PreviewCanvas(FigureCanvasQTAgg):
         self.ax.grid(True, ls=":", alpha=0.4)
 
         cursor = 0.0
-        label_bottom = 0.0
         for panel in pattern.panels:
             x0, y0, x1, y1 = panel.bbox()
             ox = cursor - x0
@@ -43,10 +42,9 @@ class PreviewCanvas(FigureCanvasQTAgg):
             for (a, b) in panel.fold_lines:
                 self.ax.plot([a[0] + ox, b[0] + ox], [a[1] + oy, b[1] + oy],
                              "--", color="#2e7d32", lw=0.8)
-            name_gap = max(45.0, (y1 - y0) * 0.12)
-            label_bottom = min(label_bottom, -name_gap)
-            self.ax.text(cursor, -name_gap, f"{panel.name} x{panel.qty}",
-                         fontsize=8, color="#444", va="top")
+            for (a, b) in panel.mark_lines:
+                self.ax.plot([a[0] + ox, b[0] + ox], [a[1] + oy, b[1] + oy],
+                             "-.", color="#ef6c00", lw=0.7)
             for (tx, ty, txt) in panel.texts:
                 self.ax.text(tx + ox, ty + oy, txt, fontsize=7,
                              ha="center", va="center", color="#b00")
@@ -55,9 +53,6 @@ class PreviewCanvas(FigureCanvasQTAgg):
         self.ax.set_title(pattern.shape_name, pad=18)
         self.ax.relim()
         self.ax.autoscale_view()
-        # 패널명 라벨이 잘리지 않도록 아래쪽 여백 확보
-        y_lo, y_hi = self.ax.get_ylim()
-        self.ax.set_ylim(min(y_lo, label_bottom - 15), y_hi)
         self.draw()
 
     def show_drawing(self, drawing, gap: float = 120.0):
@@ -92,12 +87,12 @@ class PreviewCanvas(FigureCanvasQTAgg):
                     self.ax.plot([a[0] + ox, b[0] + ox], [a[1] + oy, b[1] + oy],
                                  "-", color="#c62828", lw=0.7)
                 self.ax.text(tpos[0] + ox, tpos[1] + oy, txt, fontsize=7,
-                             color="#c62828", ha="center", va="bottom",
+                             color="#c62828", ha="center", va="center",
                              rotation=ang)
             for lb in view.labels:
                 self.ax.text(lb.pos[0] + ox, lb.pos[1] + oy, lb.text,
                              fontsize=7, color="#333", ha="center")
-            name_gap = max(55.0, (y1 - y0) * 0.15)
+            name_gap = max(12.0, (y1 - y0) * 0.04)
             label_top = max(label_top, (y1 - y0) + name_gap)
             self.ax.text(cursor, (y1 - y0) + name_gap, view.name, fontsize=8,
                          color="#000", va="bottom")
@@ -107,7 +102,7 @@ class PreviewCanvas(FigureCanvasQTAgg):
         self.ax.autoscale_view()
         # 뷰 제목이 잘리지 않도록 위쪽 여백 확보
         y_lo, y_hi = self.ax.get_ylim()
-        self.ax.set_ylim(y_lo, max(y_hi, label_top + 25))
+        self.ax.set_ylim(y_lo, max(y_hi, label_top + 12))
         self.draw()
 
     def show_nesting(self, result, gap: float = 200.0):

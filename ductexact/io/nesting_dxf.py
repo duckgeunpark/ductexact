@@ -14,10 +14,12 @@ def export_nesting(result: NestResult, path: str, out_unit: str = "mm",
     doc = ezdxf.new(setup=True)
     doc.header["$INSUNITS"] = _INSUNITS.get(out_unit, 4)
     msp = doc.modelspace()
-    for name, color in (("SHEET", 5), ("OUTLINE", 7), ("FOLD", 3), ("TEXT", 2)):
+    for name, color in (("SHEET", 5), ("OUTLINE", 7), ("FOLD", 3),
+                        ("MARK", 30), ("TEXT", 2)):
         if name not in doc.layers:
             doc.layers.add(name, color=color)
     doc.layers.get("FOLD").dxf.linetype = "DASHED"
+    doc.layers.get("MARK").dxf.linetype = "DASHDOT"
 
     def cv(v):
         return from_mm(v, out_unit)
@@ -39,6 +41,10 @@ def export_nesting(result: NestResult, path: str, out_unit: str = "mm",
                 msp.add_line((cv(a[0]) + ox, cv(a[1])),
                              (cv(b[0]) + ox, cv(b[1])),
                              dxfattribs={"layer": "FOLD"})
+            for a, b in pl.mark_lines:
+                msp.add_line((cv(a[0]) + ox, cv(a[1])),
+                             (cv(b[0]) + ox, cv(b[1])),
+                             dxfattribs={"layer": "MARK"})
         ox += sw + cv(sheet_gap)
 
     doc.saveas(path)

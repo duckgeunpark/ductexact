@@ -30,24 +30,24 @@ class RectStraight(Shape):
         # 외형: 좌하단 원점
         outline = [(0, 0), (dev_w, 0), (dev_w, dev_l), (0, dev_l)]
 
-        # 접기선: 누적 W,H,W 위치 (네 면 분할)
+        # 접기선: 누적 W,H,W 위치 (네 면 분할 — 실제 절곡)
         folds = []
         for x in (W, W + H, 2 * W + H):
             folds.append(((x, 0), (x, dev_l)))
-        # 심 영역 경계 표시
-        if seam > 0:
-            folds.append(((2 * (W + H), 0), (2 * (W + H), dev_l)))
 
-        # 단부 접기선
+        # 여유 경계선(심·단부) — 접는 선이 아니라 본체/여유 경계 표시
+        marks = []
+        if seam > 0:
+            marks.append(((2 * (W + H), 0), (2 * (W + H), dev_l)))
         if end > 0:
-            folds.append(((0, end), (dev_w, end)))
-            folds.append(((0, dev_l - end), (dev_w, dev_l - end)))
+            marks.append(((0, end), (dev_w, end)))
+            marks.append(((0, dev_l - end), (dev_w, dev_l - end)))
 
         texts = [(dev_w / 2, dev_l / 2, f"{self.name}  {W:g}x{H:g}, L={L:g}")]
 
         pat = Pattern(self.name)
         pat.add_panel(Panel("본체(Body)", outline, qty=1,
-                            fold_lines=folds, texts=texts))
+                            fold_lines=folds, mark_lines=marks, texts=texts))
         pat.add_row(항목="전개 폭", 값=round(dev_w, 1), 단위="mm")
         pat.add_row(항목="전개 길이", 값=round(dev_l, 1), 단위="mm")
         pat.add_row(항목="심 여유", 값=round(seam, 1), 단위="mm")

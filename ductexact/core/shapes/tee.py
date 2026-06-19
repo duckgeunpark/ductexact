@@ -79,12 +79,19 @@ class RoundTee(Shape):
             outline += [(dev_w, y_seam), (dev_w, free_y)]
         else:
             outline += [(circ, free_y)]
-        folds = []
+        marks = []
         if seam > 0:
-            folds.append(((circ, y_seam), (circ, free_y)))   # 심 경계
+            marks.append(((circ, y_seam), (circ, free_y)))   # 심 경계
         if end > 0:
-            folds.append(((0.0, top_y), (dev_w, top_y)))     # 단부 접기선
-        branch = Panel("분기관 Branch", outline, qty=1, fold_lines=folds,
+            marks.append(((0.0, top_y), (dev_w, top_y)))     # 단부 여유 경계
+        # 새들 밑변은 원통-원통 교선(원호 아님, 반경 없음) → 좌표법 공식 명시
+        saddle = {"kind": "formula", "name": "새들 컷(밑변)",
+                  "expr": "원통교선: s(φ)=(√(R²−r²cos²φ) − r·sinφ·cosα)/sinα, "
+                          "x=원주·φ/2π",
+                  "params": {"본관R": R, "분기r": r,
+                             "각도α": f"{p['angle']:g}°", "원주": circ}}
+        branch = Panel("분기관 Branch", outline, qty=1, mark_lines=marks,
+                       curves=[saddle],
                        texts=[(circ / 2, top_y / 2, f"Ø{Db:g} L={Lb:g}")])
 
         # --- 본관 구멍 템플릿 (본관 표면 전개: U=R·ψ, V=x) ---
@@ -143,13 +150,14 @@ class RectTee(Shape):
         dev_w = 2 * (Wb + Hb) + seam
         dev_l = Lb + end
         folds = [((x, 0), (x, dev_l)) for x in (Wb, Wb + Hb, 2 * Wb + Hb)]
+        marks = []
         if seam > 0:
-            folds.append(((2 * (Wb + Hb), 0), (2 * (Wb + Hb), dev_l)))  # 심 경계
+            marks.append(((2 * (Wb + Hb), 0), (2 * (Wb + Hb), dev_l)))  # 심 경계
         if end > 0:
-            folds.append(((0, Lb), (dev_w, Lb)))                       # 단부 접기선
+            marks.append(((0, Lb), (dev_w, Lb)))                       # 단부 여유 경계
         body = Panel("분기관 Branch",
                      [(0, 0), (dev_w, 0), (dev_w, dev_l), (0, dev_l)],
-                     qty=1, fold_lines=folds,
+                     qty=1, fold_lines=folds, mark_lines=marks,
                      texts=[(dev_w / 2, dev_l / 2, f"{Wb:g}x{Hb:g} L={Lb:g}")])
         # 본관 구멍: 분기 단면 직사각형(평면 본관 가정)
         hole = Panel("본관 구멍 Hole", [(0, 0), (Wb, 0), (Wb, Hb), (0, Hb)], qty=1,

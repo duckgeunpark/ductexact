@@ -74,17 +74,24 @@ class RoundElbow(Shape):
         pat = Pattern(self.name)
         warn = mid_half - a
         # 끝조각: 한쪽 평평(a_bottom=0, 덕트 연결단→단부여유), 한쪽 미터(a_top=a)
+        circ = math.pi * D
+        # 미터 절단선은 원호가 아니라 사인곡선(반경 없음) → 공식/좌표법으로 명시
+        sine = {"kind": "formula", "name": "미터 절단선",
+                "expr": "절단선 = 중심 ± (조각길이/2 + a·cos(2π·x/원주))",
+                "params": {"진폭 a": a, "원주": circ}}
         end_outline, end_fold = _gore_outline(r, end_half, 0.0, a,
                                               seam=seam, end_bottom=end)
         pat.add_panel(Panel("끝조각 End gore", end_outline, qty=2,
-                            fold_lines=[end_fold] if end_fold else [],
-                            texts=[(math.pi * D / 2, 0, "END x2")]))
+                            mark_lines=[end_fold] if end_fold else [],
+                            curves=[sine],
+                            texts=[(circ / 2, 0, "END x2")]))
 
         if n > 2:
             mid_outline, mid_fold = _gore_outline(r, mid_half, a, a, seam=seam)
             pat.add_panel(Panel("중간조각 Mid gore", mid_outline, qty=n - 2,
-                                fold_lines=[mid_fold] if mid_fold else [],
-                                texts=[(math.pi * D / 2, 0, f"MID x{n-2}")]))
+                                mark_lines=[mid_fold] if mid_fold else [],
+                                curves=[sine],
+                                texts=[(circ / 2, 0, f"MID x{n-2}")]))
 
         pat.add_row(항목="원주 πD", 값=round(math.pi * D, 1), 단위="mm")
         pat.add_row(항목="전개 폭(원주+심)", 값=round(math.pi * D + seam, 1), 단위="mm")
