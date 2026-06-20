@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QListWidget, QGroupBox,
     QComboBox, QPushButton, QLabel, QTableWidget, QTableWidgetItem, QFormLayout,
     QFileDialog, QMessageBox, QPlainTextEdit, QCheckBox, QDoubleSpinBox, QTabWidget,
+    QToolButton, QMenu, QSizePolicy,
 )
 from PySide6.QtCore import Qt
 
@@ -19,6 +20,7 @@ from ..config import load_config
 from ..io.dxf_export import export_pattern
 from ..io.nesting_dxf import export_nesting
 from ..io.drawing_dxf import export_drawing
+from ..io.sheet_dxf import export_sheet
 from ..io.table_export import (
     export_csv, export_draw_csv, draw_table, as_text, DRAW_HEADERS,
 )
@@ -60,18 +62,27 @@ class MainWindow(QMainWindow):
 
         self.gen_btn = QPushButton("전개도 생성")
         self.gen_btn.clicked.connect(self.generate)
-        mid.addWidget(self.gen_btn)
+
+        # 저장: 본체 클릭=제작도 시트 DXF(기본), 우측 화살표=나머지 저장 선택지
+        self.save_btn = QToolButton()
+        self.save_btn.setText("저장 (제작도 시트 DXF)")
+        self.save_btn.setToolButtonStyle(Qt.ToolButtonTextOnly)
+        self.save_btn.setPopupMode(QToolButton.MenuButtonPopup)
+        self.save_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.save_btn.clicked.connect(self.export_sheet_file)
+        save_menu = QMenu(self.save_btn)
+        save_menu.addAction("제작도 시트 DXF", self.export_sheet_file)
+        save_menu.addSeparator()
+        save_menu.addAction("완성도 DXF", self.export_drawing_file)
+        save_menu.addAction("전개도 DXF", self.export_dxf)
+        save_menu.addAction("전개도 CSV", self.export_csv_file)
+        self.save_btn.setMenu(save_menu)
+
+        # 한 줄에 생성/저장을 반반으로
         btn_row = QHBoxLayout()
-        self.dxf_btn = QPushButton("DXF 내보내기")
-        self.dxf_btn.clicked.connect(self.export_dxf)
-        self.csv_btn = QPushButton("CSV 내보내기")
-        self.csv_btn.clicked.connect(self.export_csv_file)
-        btn_row.addWidget(self.dxf_btn)
-        btn_row.addWidget(self.csv_btn)
+        btn_row.addWidget(self.gen_btn, 1)
+        btn_row.addWidget(self.save_btn, 1)
         mid.addLayout(btn_row)
-        self.draw_dxf_btn = QPushButton("완성도 DXF 내보내기")
-        self.draw_dxf_btn.clicked.connect(self.export_drawing_file)
-        mid.addWidget(self.draw_dxf_btn)
         mid.addStretch(1)
         midw = QWidget()
         midw.setLayout(mid)
@@ -277,6 +288,37 @@ class MainWindow(QMainWindow):
             return
         export_drawing(self.current_drawing, path, self.outunit_cb.currentText())
         QMessageBox.information(self, "완료", f"저장됨:\n{path}")
+
+    def export_sheet_file(self):
+        """제작도 시트(표제부 + 조립도 + 절단상세) DXF — 023_cutting detail 형식."""
+        if not self.current_pattern:
+            QMessageBox.information(self, "안내", "먼저 전개도를 생성하세요.")
+            return
+        path, _ = QFileDialog.getSaveFileName(self, "제작도 시트 DXF 저장",
+                                              "fab_sheet.dxf", "DXF (*.dxf)")
+        if not path:
+            return
+        cfg = self._settings()
+        meta = {
+            "material": "GALV. STEEL",
+            "thickness_mm": cfg.thickness(),
+            "thickness": f"{self.gauge_cb.currentText()}(GA) / {cfg.thickness():.3f}(mm)",
+            "duct_size": self._duct_size_label(),
+        }
+        export_sheet(self.current_pattern, self.current_drawing, path, meta)
+        QMessageBox.information(self, "완료", f"저장됨:\n{path}")
+
+    def _duct_size_label(self) -> str:
+        """입력 폼에서 W×H 또는 Ø D 를 읽어 덕트 사이즈 문자열로."""
+        try:
+            raw = self.param_form.raw_values()
+        except Exception:  # noqa: BLE001
+            return ""
+        if "W" in raw and "H" in raw:
+            return f"{raw['W'][0]:g} x {raw['H'][0]:g}"
+        if "D" in raw:
+            return f"Ø{raw['D'][0]:g}"
+        return ""
 
     def _run_nest(self):
         if not self.current_pattern:
