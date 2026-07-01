@@ -59,13 +59,14 @@ def _rect_elbow(p):
     W, H, Rt = p["W"], p["H"], p["Rt"]
     ang = p["angle"]
     th = math.radians(ang)
-    leg = p.get("leg", 50.0)
+    leg1 = p.get("leg1", 50.0)      # 입구단 직관
+    leg2 = p.get("leg2", 50.0)      # 출구단 직관
     Rh = Rt + W
     mid = th / 2
     cm, sm = math.cos(mid), math.sin(mid)
 
     # --- 측면도: 조립된 엘보 실루엣(호 + 양단 직관) ---
-    profile = cheek_outline(Rt, Rh, th, leg, 60)
+    profile = cheek_outline(Rt, Rh, th, leg1, leg2, 60)
     side = View(f"{ang:g}° 엘보 측면도", [profile])
     side.labels = [
         Label((Rt * cm * 0.85, Rt * sm * 0.85), f"R{Rt:g}"),
@@ -73,8 +74,8 @@ def _rect_elbow(p):
         Label((Rt * cm * 0.32, Rt * sm * 0.32), f"{ang:g}°"),
     ]
     side.dims = [
-        LinearDim((Rt, -leg), (Rh, -leg), (0, -leg - DG), 0, f"W {W:g}"),
-        LinearDim((Rh, -leg), (Rh, 0), (Rh + DG, 0), 90, f"직관 {leg:g}"),
+        LinearDim((Rt, -leg1), (Rh, -leg1), (0, -leg1 - DG), 0, f"W {W:g}"),
+        LinearDim((Rh, -leg1), (Rh, 0), (Rh + DG, 0), 90, f"입구직관 {leg1:g}"),
     ]
 
     # --- 단면도: 입구 W×H ---

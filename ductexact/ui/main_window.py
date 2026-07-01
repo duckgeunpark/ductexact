@@ -65,10 +65,12 @@ class MainWindow(QMainWindow):
 
         # 저장: 본체 클릭=제작도 시트 DXF(기본), 우측 화살표=나머지 저장 선택지
         self.save_btn = QToolButton()
-        self.save_btn.setText("저장 (제작도 시트 DXF)")
+        self.save_btn.setText("저장")
         self.save_btn.setToolButtonStyle(Qt.ToolButtonTextOnly)
         self.save_btn.setPopupMode(QToolButton.MenuButtonPopup)
         self.save_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        # 생성 버튼과 동일한 높이로 맞춤
+        self.save_btn.setMinimumHeight(self.gen_btn.sizeHint().height())
         self.save_btn.clicked.connect(self.export_sheet_file)
         save_menu = QMenu(self.save_btn)
         save_menu.addAction("제작도 시트 DXF", self.export_sheet_file)
